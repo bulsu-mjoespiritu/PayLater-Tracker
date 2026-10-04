@@ -5,6 +5,7 @@ import '../models/bill.dart';
 import '../providers/bill_provider.dart';
 import '../screens/add_bill_screen.dart';
 import '../theme/app_theme.dart';
+import 'app_widgets.dart';
 import 'status_badge.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
@@ -13,7 +14,7 @@ final _fullDateFmt = DateFormat('MMMM dd, yyyy');
 
 /// Detailed, interactive card shown on the Home screen for a bill's
 /// currently-active installment. Lets the user type in a saving amount
-/// and tap "+ Add" to apply it.
+/// and tap "+ Add", or tap "Mark as Paid" to cover whatever is left.
 class BillDetailCard extends StatefulWidget {
   final Bill bill;
 
@@ -88,6 +89,52 @@ class _BillDetailCardState extends State<BillDetailCard> {
     FocusScope.of(context).unfocus();
   }
 
+  /// One tap to pay the month: adds exactly what's still missing, so the
+  /// amount never has to be typed in.
+  Future<void> _markPaid(BuildContext context) async {
+    final bill = widget.bill;
+    final current = bill.currentInstallment;
+    if (current == null) return;
+
+    final p = context.pal;
+    final remaining = current.remaining(bill.monthlyPayment);
+    final monthIndex = current.monthIndex;
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<BillProvider>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mark as paid?'),
+        content: Text(
+          remaining > 0
+              ? 'Month $monthIndex of "${bill.name}" will be marked as paid. '
+                  '${_currency.format(remaining)} will be added to cover what\'s left.'
+              : 'Month $monthIndex of "${bill.name}" will be marked as paid.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: p.green),
+            child: const Text('Mark as Paid'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    provider.markCurrentAsPaid(bill.id);
+    _controller.clear();
+    messenger.showSnackBar(
+      SnackBar(content: Text('Month $monthIndex of "${bill.name}" marked as paid')),
+    );
+  }
+
   void _editBill(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => AddBillScreen(billToEdit: widget.bill)),
@@ -95,6 +142,7 @@ class _BillDetailCardState extends State<BillDetailCard> {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
+    final p = context.pal;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -109,7 +157,7 @@ class _BillDetailCardState extends State<BillDetailCard> {
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.red),
+            style: TextButton.styleFrom(foregroundColor: p.red),
             child: const Text('Delete'),
           ),
         ],
@@ -127,6 +175,7 @@ class _BillDetailCardState extends State<BillDetailCard> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
+    final p = context.pal;
 
     if (bill.isCompleted) {
       return _CompletedCard(bill: bill);
@@ -135,16 +184,7 @@ class _BillDetailCardState extends State<BillDetailCard> {
     final inst = bill.currentInstallment!;
     final progress = inst.progress(bill.monthlyPayment);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -154,38 +194,34 @@ class _BillDetailCardState extends State<BillDetailCard> {
             children: [
               Text(
                 _monthFmt.format(inst.dueDate),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: p.text),
               ),
               const SizedBox(width: 6),
               Text(
                 '(Month ${inst.monthIndex} of ${bill.installmentMonths})',
-                style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 13, color: p.textMuted, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               StatusBadge.forLabel(inst.displayLabel),
               const SizedBox(width: 4),
-              IconButton(
-                onPressed: () => _editBill(context),
-                icon: const Icon(Icons.edit_outlined, size: 19, color: AppColors.textMuted),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              CardIconButton(
+                icon: Icons.edit_outlined,
+                color: p.textMuted,
                 tooltip: 'Edit bill',
+                onPressed: () => _editBill(context),
               ),
-              IconButton(
-                onPressed: () => _confirmDelete(context),
-                icon: const Icon(Icons.delete_outline, size: 19, color: AppColors.red),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              CardIconButton(
+                icon: Icons.delete_outline,
+                color: p.red,
                 tooltip: 'Delete bill',
+                onPressed: () => _confirmDelete(context),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             bill.name,
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 12, color: p.textMuted, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 10),
           // Big monthly amount
@@ -195,10 +231,10 @@ class _BillDetailCardState extends State<BillDetailCard> {
             children: [
               Text(
                 _currency.format(bill.monthlyPayment),
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: p.text),
               ),
               const SizedBox(width: 8),
-              const Text('monthly', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              Text('monthly', style: TextStyle(fontSize: 13, color: p.textMuted)),
             ],
           ),
           const SizedBox(height: 6),
@@ -206,7 +242,7 @@ class _BillDetailCardState extends State<BillDetailCard> {
             '${_fullDateFmt.format(inst.dueDate)} Due  •  Month ${inst.monthIndex}/${bill.installmentMonths}',
             style: TextStyle(
               fontSize: 12.5,
-              color: inst.isOverdue ? AppColors.red : AppColors.textMuted,
+              color: inst.isOverdue ? p.red : p.textMuted,
               fontWeight: inst.isOverdue ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
@@ -218,14 +254,14 @@ class _BillDetailCardState extends State<BillDetailCard> {
                 child: _LabelValue(
                   label: 'Saved',
                   value: _currency.format(inst.saved),
-                  valueColor: AppColors.green,
+                  valueColor: p.green,
                 ),
               ),
               Expanded(
                 child: _LabelValue(
                   label: 'Remaining',
                   value: _currency.format(inst.remaining(bill.monthlyPayment)),
-                  valueColor: AppColors.red,
+                  valueColor: p.red,
                   alignEnd: true,
                 ),
               ),
@@ -238,8 +274,8 @@ class _BillDetailCardState extends State<BillDetailCard> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: AppColors.lightGreyBg,
-              valueColor: const AlwaysStoppedAnimation(AppColors.green),
+              backgroundColor: p.greyBg,
+              valueColor: AlwaysStoppedAnimation(p.green),
             ),
           ),
           const SizedBox(height: 4),
@@ -247,14 +283,17 @@ class _BillDetailCardState extends State<BillDetailCard> {
             alignment: Alignment.centerRight,
             child: Text(
               '${(progress * 100).round()}%',
-              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 11.5, color: p.textMuted, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(height: 14),
-          // Amount input, shared by both "Add" and "Withdraw"
+          // Amount input, shared by both "Add" and "Withdraw".
+          // The large bottom scrollPadding keeps the buttons below the field
+          // visible above the keyboard while typing.
           TextField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 200),
             decoration: const InputDecoration(
               hintText: 'Amount ₱',
               isDense: true,
@@ -267,11 +306,11 @@ class _BillDetailCardState extends State<BillDetailCard> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _withdraw(context),
-                  icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: AppColors.red),
+                  icon: Icon(Icons.arrow_downward_rounded, size: 16, color: p.red),
                   label: const Text('Withdraw'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.red,
-                    side: const BorderSide(color: AppColors.red),
+                    foregroundColor: p.red,
+                    side: BorderSide(color: p.red),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -288,6 +327,21 @@ class _BillDetailCardState extends State<BillDetailCard> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          // One-tap pay: no need to type the amount.
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _markPaid(context),
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+              label: Text('Mark as Paid  •  ${_currency.format(inst.remaining(bill.monthlyPayment))}'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           ),
         ],
       ),
@@ -310,10 +364,11 @@ class _LabelValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return Column(
       crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+        Text(label, style: TextStyle(fontSize: 12, color: p.textMuted)),
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: valueColor)),
       ],
@@ -327,32 +382,21 @@ class _CompletedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
+    final p = context.pal;
+    return AppCard(
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(color: AppColors.lightGreenBg, shape: BoxShape.circle),
-            child: const Icon(Icons.check_rounded, color: AppColors.green),
-          ),
-          const SizedBox(width: 14),
+          IconBadge(icon: Icons.check_rounded, color: p.green, background: p.greenBg),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(bill.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                Text(bill.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: p.text)),
                 const SizedBox(height: 2),
                 Text(
                   'All ${bill.installmentMonths} months paid • ${_currency.format(bill.totalBill)}',
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                  style: TextStyle(fontSize: 12.5, color: p.textMuted),
                 ),
               ],
             ),

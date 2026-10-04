@@ -159,6 +159,11 @@ class Bill {
   /// Total unpaid balance for this bill = total bill minus all fully-paid installments.
   double get totalUnpaidBalance => totalBill - (paidCount * monthlyPayment);
 
+  /// Money set aside on installments that aren't paid yet.
+  double get savedTowardUnpaid => installments
+      .where((i) => i.status != InstallmentStatus.paid)
+      .fold(0.0, (sum, i) => sum + i.saved);
+
   /// The installment the user is currently saving toward (first non-paid one).
   Installment? get currentInstallment {
     for (final inst in installments) {

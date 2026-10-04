@@ -52,4 +52,3 @@ lib/
 - The app starts completely empty on a fresh install — no sample/demo data. You add your first bill from the Home screen.
 - **Data is saved locally** using `shared_preferences` (JSON under the hood) — bills, history, and the transaction log all survive closing/reopening the app or restarting the phone. Nothing leaves the device and no account is required. If you outgrow this later (e.g. want multi-device sync), swap the storage layer in `BillProvider` for a proper local DB (`sqflite`, `hive`) or a backend, without touching the UI code.
 - Currency formatting uses `intl`'s `en_PH` locale with a `₱` symbol.
-# PayLater-Tracker

@@ -49,6 +49,9 @@ class BillProvider extends ChangeNotifier {
   /// Sum of unpaid balances across every bill.
   double get totalUnpaidBalance => _bills.fold(0.0, (sum, b) => sum + b.totalUnpaidBalance);
 
+  /// Money currently set aside toward unpaid installments across all bills.
+  double get totalSavedMoney => _bills.fold(0.0, (sum, b) => sum + b.savedTowardUnpaid);
+
   /// Mirrors totalUnpaidBalance — shown separately per the dashboard design
   /// (kept as its own getter in case remaining logic ever diverges).
   double get totalRemaining => totalUnpaidBalance;
@@ -319,7 +322,9 @@ class BillProvider extends ChangeNotifier {
     if (remaining > 0) {
       addSaving(billId, remaining);
     } else {
-      notifyListeners();
+      // Already saved enough (e.g. the monthly amount was lowered after
+      // saving) — just flip it to Paid.
+      setInstallmentSaved(billId, current.monthIndex, bill.monthlyPayment);
     }
   }
 

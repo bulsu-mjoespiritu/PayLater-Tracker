@@ -112,20 +112,24 @@ class _AddBillScreenState extends State<AddBillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return Scaffold(
       appBar: AppBar(title: Text(widget.isEditing ? 'Edit Bill' : 'Add New Bill')),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           const _FieldLabel('Bill Name'),
           TextField(
             controller: _nameController,
+            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 160),
             decoration: const InputDecoration(hintText: 'e.g. Shopee SPayLater'),
           ),
           const SizedBox(height: 18),
           const _FieldLabel('Monthly Payment'),
           TextField(
             controller: _monthlyController,
+            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 160),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(prefixText: '₱  ', hintText: '0.00'),
             onChanged: (_) => setState(() {}),
@@ -144,13 +148,13 @@ class _AddBillScreenState extends State<AddBillScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.primaryBlue : AppColors.lightGreyBg,
+                        color: selected ? AppColors.primaryBlue : p.fieldBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '$m',
                         style: TextStyle(
-                          color: selected ? Colors.white : AppColors.textDark,
+                          color: selected ? Colors.white : p.text,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -165,18 +169,18 @@ class _AddBillScreenState extends State<AddBillScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.lightBlueBg,
+              color: p.blueBg,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total Bill (Auto-calculated)',
-                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                Text('Total Bill (Auto-calculated)',
+                    style: TextStyle(fontSize: 12.5, color: p.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(
                   _currency.format(_totalBill),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primaryBlue),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: p.blue),
                 ),
               ],
             ),
@@ -187,10 +191,10 @@ class _AddBillScreenState extends State<AddBillScreen> {
             onTap: _pickDate,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              decoration: BoxDecoration(color: AppColors.lightGreyBg, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: p.fieldBg, borderRadius: BorderRadius.circular(12)),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textMuted),
+                  Icon(Icons.calendar_today_outlined, size: 18, color: p.textMuted),
                   const SizedBox(width: 10),
                   Text(_dateFmt.format(_dueDate), style: const TextStyle(fontSize: 15)),
                 ],
@@ -202,14 +206,15 @@ class _AddBillScreenState extends State<AddBillScreen> {
             const _FieldLabel('Initial Saved (Optional)'),
             TextField(
               controller: _initialSavedController,
+              scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 200),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(prefixText: '₱  ', hintText: '0.00'),
             ),
           ] else ...[
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Progress already saved on this bill will be kept.',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12.5, color: p.textMuted),
             ),
           ],
           const SizedBox(height: 28),
@@ -232,7 +237,7 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+      child: Text(text, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: context.pal.text)),
     );
   }
 }

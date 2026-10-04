@@ -4,15 +4,29 @@ import 'package:provider/provider.dart';
 import '../models/bill.dart';
 import '../providers/bill_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_widgets.dart';
 import '../widgets/status_badge.dart';
-import 'add_bill_screen.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 final _monthFmt = DateFormat('MMM');
 final _dateFmt = DateFormat('MMM dd, yyyy');
 
-class BillsScreen extends StatelessWidget {
+class BillsScreen extends StatefulWidget {
   const BillsScreen({super.key});
+
+  @override
+  State<BillsScreen> createState() => _BillsScreenState();
+}
+
+class _BillsScreenState extends State<BillsScreen> {
+  /// Ids of bills the user has minimized. Everything starts expanded.
+  final Set<String> _collapsed = {};
+
+  void _toggle(String billId) {
+    setState(() {
+      if (!_collapsed.remove(billId)) _collapsed.add(billId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,29 +35,27 @@ class BillsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bills'),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddBillScreen()),
-              ),
-              child: const Text('+ New Bill'),
-            ),
+            padding: EdgeInsets.only(right: 16),
+            child: NewBillButton(),
           ),
         ],
       ),
       body: bills.isEmpty
-          ? const Center(
-              child: Text('No bills added yet', style: TextStyle(color: AppColors.textMuted)),
-            )
+          ? const EmptyState(icon: Icons.receipt_long_outlined, title: 'No bills added yet')
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
               itemCount: bills.length,
-              itemBuilder: (context, index) => _BillGroupCard(bill: bills[index]),
+              itemBuilder: (context, index) {
+                final bill = bills[index];
+                return _BillGroupCard(
+                  key: ValueKey(bill.id),
+                  bill: bill,
+                  expanded: !_collapsed.contains(bill.id),
+                  onToggle: () => _toggle(bill.id),
+                );
+              },
             ),
     );
   }
@@ -51,52 +63,84 @@ class BillsScreen extends StatelessWidget {
 
 class _BillGroupCard extends StatelessWidget {
   final Bill bill;
-  const _BillGroupCard({required this.bill});
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  const _BillGroupCard({
+    super.key,
+    required this.bill,
+    required this.expanded,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
-        ],
-      ),
+    final p = context.pal;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(color: AppColors.lightOrangeBg, shape: BoxShape.circle),
-                child: const Icon(Icons.shopping_bag_outlined, color: AppColors.orange, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(bill.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Total Bill: ${_currency.format(bill.totalBill)}  •  ${bill.installmentMonths} months',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          // Tap the header to minimize / expand the bill.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  IconBadge(icon: Icons.shopping_bag_outlined, color: p.orange, background: p.orangeBg),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(bill.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: p.text)),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Total Bill: ${_currency.format(bill.totalBill)}  •  ${bill.installmentMonths} months',
+                          style: TextStyle(fontSize: 12, color: p.textMuted),
+                        ),
+                        if (!expanded) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${bill.paidCount} of ${bill.installmentMonths} paid',
+                            style: TextStyle(fontSize: 12, color: p.textMuted, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  StatusBadge.forLabel(bill.statusLabel),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down_rounded, color: p.textMuted),
+                  ),
+                ],
               ),
-              StatusBadge.forLabel(bill.statusLabel),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 4),
-          ...bill.installments.map((inst) => _InstallmentRow(bill: bill, inst: inst)),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(height: 1),
+                        const SizedBox(height: 4),
+                        ...bill.installments.map((inst) => _InstallmentRow(bill: bill, inst: inst)),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity, height: 0),
+          ),
         ],
       ),
     );
@@ -109,6 +153,7 @@ class _InstallmentRow extends StatelessWidget {
   const _InstallmentRow({required this.bill, required this.inst});
 
   Future<void> _editSaved(BuildContext context) async {
+    final p = context.pal;
     final controller = TextEditingController(text: _trimZeros(inst.saved));
     final result = await showDialog<double>(
       context: context,
@@ -121,7 +166,7 @@ class _InstallmentRow extends StatelessWidget {
             Text(
               'Use this to fix a mistake — like accidentally tapping "+ Add" '
               'and marking this month paid too early.',
-              style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12.5, color: p.textMuted),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -162,6 +207,7 @@ class _InstallmentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     final progress = inst.progress(bill.monthlyPayment);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -172,38 +218,36 @@ class _InstallmentRow extends StatelessWidget {
             children: [
               Text(
                 _monthFmt.format(inst.dueDate),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: p.text),
               ),
               const SizedBox(width: 6),
               Text(
                 '(Month ${inst.monthIndex} of ${bill.installmentMonths})',
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12, color: p.textMuted, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               StatusBadge.forLabel(inst.displayLabel),
-              const SizedBox(width: 2),
-              IconButton(
-                onPressed: () => _editSaved(context),
-                icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.textMuted),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              const SizedBox(width: 4),
+              CardIconButton(
+                icon: Icons.edit_outlined,
+                color: p.textMuted,
                 tooltip: 'Edit saved amount',
+                onPressed: () => _editSaved(context),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('Due: ${_dateFmt.format(inst.dueDate)}', style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
+          Text('Due: ${_dateFmt.format(inst.dueDate)}', style: TextStyle(fontSize: 12.5, color: p.textMuted)),
           const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
                 child: Text('Saved: ${_currency.format(inst.saved)}',
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.textDark, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 12.5, color: p.text, fontWeight: FontWeight.w600)),
               ),
               Text(
                 'Remaining: ${_currency.format(inst.remaining(bill.monthlyPayment))}',
-                style: const TextStyle(fontSize: 12.5, color: AppColors.red, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12.5, color: p.red, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -213,9 +257,9 @@ class _InstallmentRow extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: AppColors.lightGreyBg,
+              backgroundColor: p.greyBg,
               valueColor: AlwaysStoppedAnimation(
-                inst.status == InstallmentStatus.paid ? AppColors.green : AppColors.primaryBlue,
+                inst.status == InstallmentStatus.paid ? p.green : p.blue,
               ),
             ),
           ),

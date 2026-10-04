@@ -1,42 +1,53 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
+enum BadgeTone { red, green, blue, grey }
+
 class StatusBadge extends StatelessWidget {
   final String text;
-  final Color color;
-  final Color background;
+  final BadgeTone tone;
 
-  const StatusBadge({
-    super.key,
-    required this.text,
-    required this.color,
-    required this.background,
-  });
+  const StatusBadge._(this.text, this.tone);
 
   factory StatusBadge.forLabel(String label) {
-    if (label.contains('Overdue')) {
-      return StatusBadge(text: label, color: AppColors.red, background: AppColors.lightRedBg);
-    }
+    if (label.contains('Overdue')) return StatusBadge._(label, BadgeTone.red);
     switch (label) {
       case 'Unpaid':
-        return StatusBadge(text: label, color: AppColors.red, background: AppColors.lightRedBg);
-      case 'Pending':
-        return StatusBadge(text: label, color: AppColors.grey, background: AppColors.lightGreyBg);
-      case 'Paid':
-        return StatusBadge(text: label, color: AppColors.green, background: AppColors.lightGreenBg);
-      case 'In Progress':
-        return StatusBadge(text: label, color: AppColors.primaryBlue, background: AppColors.lightBlueBg);
-      case 'Completed':
-        return StatusBadge(text: label, color: AppColors.green, background: AppColors.lightGreenBg);
       case 'Deleted':
-        return StatusBadge(text: label, color: AppColors.red, background: AppColors.lightRedBg);
+        return StatusBadge._(label, BadgeTone.red);
+      case 'Paid':
+      case 'Completed':
+        return StatusBadge._(label, BadgeTone.green);
+      case 'In Progress':
+        return StatusBadge._(label, BadgeTone.blue);
       default:
-        return StatusBadge(text: label, color: AppColors.grey, background: AppColors.lightGreyBg);
+        return StatusBadge._(label, BadgeTone.grey);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
+    late final Color color;
+    late final Color background;
+    switch (tone) {
+      case BadgeTone.red:
+        color = p.red;
+        background = p.redBg;
+        break;
+      case BadgeTone.green:
+        color = p.green;
+        background = p.greenBg;
+        break;
+      case BadgeTone.blue:
+        color = p.blue;
+        background = p.blueBg;
+        break;
+      case BadgeTone.grey:
+        color = AppColors.grey;
+        background = p.greyBg;
+        break;
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
